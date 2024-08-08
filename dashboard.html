@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .navbar { display: flex; justify-content: space-around; padding: 10px; background: #FF4B2B; }
+    .navbar button { background-color: transparent; color: #FFFFFF; border: 1px solid #FF4B2B; padding: 10px 20px; cursor: pointer; }
+    .navbar button:hover { background-color: #FF416C; }
+    .slide-panel { position: fixed; top: 0; bottom: 0; width: 60%; background: #FF416C; z-index: 1000; overflow: auto; transition: transform 0.5s ease; padding: 20px; }
+    #profile-panel { left: 0; transform: translateX(-100%); }
+    .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 999; display: none; }
+    .spinner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.7); z-index: 9999; display: flex; justify-content: center; align-items: center; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #FF4B2B; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    #logout { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); }
+    td { text-align: center; }
+  </style>
+</head>
+<body id="dashboard">
+  <div v-if="open" class="modal-overlay">
+    <div class="modal">
+      <h3>Product Ordered</h3>
+      <button class="btn btn-danger" @click="open=!open">Ok</button>
+    </div>
+  </div>
+  <div v-if="loading" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <div class="navbar">
+    <button onclick="openPanel('profile')" @click="getuserdata">Profile</button>
+  </div>
+
+  <div id="profile-panel" class="slide-panel">
+    <h2>{{ userdetail.user_email }}</h2>
+    <h3>{{ userdetail.user_name }}</h3>
+    <button id="logout" class="btn btn-primary" @click="logout">LOGOUT</button>
+  </div>
+
+  <div id="overlay" class="overlay" onclick="closePanels()"></div>
+
+  <div class='coins'>
+    <form @submit.prevent="setAlert">
+      <select v-model="selectedcoin" @change="onCoinSelect" >
+        <option v-for="option in prices" :key="option.id" :value="option.id" >{{ option.name }}</option>
+      </select>
+      <input type="number" v-model="threshold" placeholder="Enter price threshold" required>
+      <button type="submit">Set Alert</button>
+    </form>
+
+
+
+
+
+    <center><div v-if="selected">
+      <h3>Selected Coin Details</h3>
+      <img :src="selected.image" width="20%">
+      <p><strong>Name:</strong> {{ selected.name }}</p>
+      <p><strong>Symbol:</strong> {{ selected.symbol }}</p>
+      <p><strong>Current Price:</strong> {{ selected.current_price }}</p>
+      <p><strong>Previous Price:</strong> {{ getOldPrice() }}</p>
+      <p><strong>Market Cap:</strong> {{ selected.market_cap }}</p>
+      <p><strong>Price change 24H</strong> {{ selected.price_change_24h }}</p>
+    </div>
+  </div></center>
+
+    <div>
+      <h3>Top 5 Coins</h3>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Price</th>
+            <th>Previous Price</th>
+            <th>Change 24H</th>
+           <th>Symbol</th> <th>Changed Status 24H</th>
+            
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(coin, index) in prices.slice(0, 5)" :key="coin.id">
+            <td>{{ coin.name }}</td>
+            <td>{{ coin.current_price }}</td>
+            <td>{{oldprices[index].current_price}}</td>
+            
+            <td>{{coin.price_change_24h}}</td>
+            
+            <td><img :src='coin.image' width="90"></td>
+
+            <td v-if="coin.price_change_24h>=0" bgcolor="green">Increased</td><td v-else bgcolor="red"><b>Decreased</b></td>
+            
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    
+
+  <script>
+    const token = sessionStorage.getItem('token')
+    const isRefreshing = performance.navigation.type === 1;
+    if (!token ) {
+      window.location.href = 'login.html';
+    }
+
+    const app = Vue.createApp({
+      data() {
+        return {
+          userdetail: {},
+          prices: [],
+          oldprices: [],
+          selected: null,
+          selectedcoin: '',
+          threshold: '',
+          loading: false,
+          socket:null
+        }
+      },
+     created() {
+        this.connectSocket();
+        this.getuserdata()
+      },
+      methods: {
+        connectSocket() {
+     
+          this.socket = io('http://localhost:8080');
+          this.socket.on('connection',()=>{
+         
+          })
+
+
+          this.socket.on('coinprices', (newPrices, oldPrices) => {
+        
+            this.prices = newPrices;
+            this.oldprices = oldPrices;
+          });
+
+        },
+        getOldPrice() {
+          
+          const oldPriceObj = this.oldprices.find(coin => coin.id === this.selectedcoin);
+          if (oldPriceObj) {
+           
+            return oldPriceObj.current_price;
+          } else {
+            return 'wtf'; // or handle it in some way if old price is not available
+          }
+        },
+        onCoinSelect() {
+          this.selected = this.prices.find(coin => coin.id === this.selectedcoin);
+          if (this.selected) {
+            this.getOldPrice(); // Ensure this is called only after `selected` is properly set
+          }
+        },
+        async setAlert() {
+          try {
+            alert("setting alert")
+            let response = await axios.post('http://localhost:8080/setalert', {
+              id: this.selectedcoin,
+              target:this.threshold
+            },
+            {
+              headers:{
+                Authorization: token 
+              }
+            });
+
+            if(response){
+              alert("alert set")
+            }else{
+              alert("failed to set alert")
+            }
+            // Handle response or success
+          } catch (error) {
+            console.error(error);
+            // Handle error
+          }
+        },
+        async getuserdata(){
+          try{
+            let response=await axios.get('http://localhost:8080/getuserdata',{
+              headers:{
+                Authorization:token
+              }
+            });
+
+            if(response.status===202){
+              this.userdetail=response.data
+            }else{
+              alert("failed to get user data")
+            }
+
+          }catch(error){
+            alert(error)
+          }
+        }
+        ,
+        logout() {
+          this.loading = true;
+          sessionStorage.removeItem('token');
+          window.location.href = 'login.html';
+        }
+      }
+    });
+
+    app.mount('#dashboard');
+
+   
+    function openPanel(panelId) {
+      closePanels();
+      document.getElementById('overlay').style.display = 'block';
+      const panel = document.getElementById(panelId + '-panel');
+      if (panelId === 'profile') {
+        panel.style.transform = 'translateX(0)';
+      }
+    }
+
+    function closePanels() {
+      document.getElementById('overlay').style.display = 'none';
+      const panels = document.querySelectorAll('.slide-panel');
+      panels.forEach(panel => {
+        if (panel.id === 'profile-panel') {
+          panel.style.transform = 'translateX(-100%)';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
