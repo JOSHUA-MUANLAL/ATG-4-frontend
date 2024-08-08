@@ -9,7 +9,7 @@
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
   <style>
-    body { font-family: 'Montserrat', sans-serif; }
+    body { font-family: 'Montserrat', sans-serif; color:#f3f3f3; background-color: rgb(23, 8, 57); }
     .navbar { display: flex; justify-content: space-around; padding: 10px; background: #FF4B2B; }
     .navbar button { background-color: transparent; color: #FFFFFF; border: 1px solid #FF4B2B; padding: 10px 20px; cursor: pointer; }
     .navbar button:hover { background-color: #FF416C; }
@@ -21,6 +21,32 @@
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     #logout { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); }
     td { text-align: center; }
+    th{
+     
+    }
+
+    span.inc{
+      background-color: greenyellow;
+      color:black
+    }
+
+    span.dec{
+      background-color: #FF4B2B;
+      color:white
+    }
+    button{
+      color:black;
+    }
+    select{
+      background-color: white;
+      color:black
+    }
+
+    input{
+      color:black
+    }
+
+   
   </style>
 </head>
 <body id="dashboard">
@@ -46,60 +72,78 @@
 
   <div id="overlay" class="overlay" onclick="closePanels()"></div>
 
-  <div class='coins'>
+   <center><div class='coins'>
     <form @submit.prevent="setAlert">
       <select v-model="selectedcoin" @change="onCoinSelect" >
+        <option class="color:white" disabled>Please select Currency</option>
         <option v-for="option in prices" :key="option.id" :value="option.id" >{{ option.name }}</option>
       </select>
-      <input type="number" v-model="threshold" placeholder="Enter price threshold" required>
-      <button type="submit">Set Alert</button>
+      <input  type="number" v-model="threshold" placeholder="Enter price threshold" required>
+      <button  type="submit">Set Alert</button>
     </form>
 
 
 
 
 
-    <center><div v-if="selected">
+   <div v-if="selected">
       <h3>Selected Coin Details</h3>
-      <img :src="selected.image" width="20%">
+      <img :src="selected.image" width="100">
       <p><strong>Name:</strong> {{ selected.name }}</p>
       <p><strong>Symbol:</strong> {{ selected.symbol }}</p>
       <p><strong>Current Price:</strong> {{ selected.current_price }}</p>
       <p><strong>Previous Price:</strong> {{ getOldPrice() }}</p>
       <p><strong>Market Cap:</strong> {{ selected.market_cap }}</p>
-      <p><strong>Price change 24H</strong> {{ selected.price_change_24h }}</p>
+      <p><strong>Price change 24H</strong> <span class="inc" v-if="selected.price_change_24h>=0" > {{ selected.price_change_24h }}</span><span class="dec" v-else bgcolor="red"> {{ selected.price_change_24h }}</span></p>
+      <p><strong>Price Chnage percentage 24H</strong><span class="inc" v-if="selected.price_change_percentage_24h>=0" > {{ selected.price_change_percentage_24h }}</span><span class="dec" v-else bgcolor="red"> {{ selected.price_change_percentage_24h }}</span></p>
+      <p><strong>Circulating Supply</strong>{{selected.circulating_supply}}</p>
+      <p><strong>Total Supply</strong>{{selected.total_supply}}</p>
+    </span>
+      
     </div>
   </div></center>
 
-    <div>
-      <h3>Top 5 Coins</h3>
-      <table class="table table-bordered">
-        <thead>
+  <div style="height: 700px; ">
+    
+    <center><h3>List of Coins <br> fetching new real time price count:{{count}}</h3></center>
+    <div style="max-height: 650px;">
+      <table class="table table-bordered" style="width: 100%; table-layout: fixed;">
+        <thead style="display: block;">
           <tr>
-            <th>Name</th>
-            <th>Price</th>
-            <th>Previous Price</th>
-            <th>Change 24H</th>
-           <th>Symbol</th> <th>Changed Status 24H</th>
-            
+            <th style="width: 15%;">Name</th>
+            <th style="width: 15%;">Market Cap</th>
+            <th style="width: 15%;">Price</th>
+            <th style="width: 15%;">Previous Price</th>
+            <th style="width: 15%;">Price Change Percentage</th>
+            <th style="width: 10%;">Change 24H</th>
+            <th style="width: 10%;">Symbol</th>
+            <th style="width: 15%;">Changed Status 24H</th>
           </tr>
         </thead>
-        <tbody>
-          <tr v-for="(coin, index) in prices.slice(0, 5)" :key="coin.id">
-            <td>{{ coin.name }}</td>
-            <td>{{ coin.current_price }}</td>
-            <td>{{oldprices[index].current_price}}</td>
-            
-            <td>{{coin.price_change_24h}}</td>
-            
-            <td><img :src='coin.image' width="90"></td>
-
-            <td v-if="coin.price_change_24h>=0" bgcolor="green">Increased</td><td v-else bgcolor="red"><b>Decreased</b></td>
-            
+        <tbody style="display: block; max-height: 600px; overflow-y: auto;">
+          <tr v-for="(coin, index) in prices" :key="coin.id" style="display: flex;">
+            <td style="width: 15%;">{{ coin.name }}</td>
+            <td style="width: 15%;">$ {{coin.market_cap}}</td>
+            <td style="width: 15%;">${{ coin.current_price }}</td>
+            <td style="width: 15%;">${{oldprices[index].current_price}}</td>
+            <td style="width: 15%;">
+              <span class="inc" v-if='coin.price_change_percentage_24h >= 0'>
+                {{coin.price_change_percentage_24h}}%
+              </span>
+              <span class="dec" v-else>
+                {{coin.price_change_percentage_24h}}%
+              </span>
+            </td>
+            <td style="width: 10%;">{{coin.price_change_24h}}</td>
+            <td style="width: 10%;"><img :src='coin.image' width="90"></td>
+            <td style="width: 15%;" v-if="coin.price_change_24h >= 0" bgcolor="green">Increasing</td>
+            <td style="width: 15%;" v-else bgcolor="red"><b>Decreasing</b></td>
           </tr>
         </tbody>
       </table>
     </div>
+  </div>
+  
 
     
 
@@ -120,11 +164,16 @@
           selectedcoin: '',
           threshold: '',
           loading: false,
-          socket:null
+          socket:null,
+          count:0
         }
       },
      created() {
         this.connectSocket();
+        this.getuserdata()
+      },
+      mounted(){
+        this.connectSocket()
         this.getuserdata()
       },
       methods: {
@@ -136,10 +185,11 @@
           })
 
 
-          this.socket.on('coinprices', (newPrices, oldPrices) => {
+          this.socket.on('coinprices', (newPrices, oldPrices,a) => {
         
             this.prices = newPrices;
             this.oldprices = oldPrices;
+            this.count=a
           });
 
         },
